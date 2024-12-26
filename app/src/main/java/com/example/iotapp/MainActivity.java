@@ -1,174 +1,145 @@
 package com.example.iotapp;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.snackbar.Snackbar;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.JsonHttpResponseHandler;
+import com.loopj.android.http.RequestParams;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
+
 import cz.msebera.android.httpclient.Header;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String THINGSPEAK_API_URL = "https://api.thingspeak.com/channels/2794908/fields/1.json?api_key=RKTMBAN559EUAS9B&results=1";
-    private TextView temperaturaTextView, confirmationTextView;
-    private ProgressBar progressBar;
-    private Button botonSi, botonNo, botonLeer;
+    private static final String CHANNEL_READ_URL = "https://api.thingspeak.com/channels/2794908/feeds.json";
+    private static final String CHANNEL_WRITE_URL = "https://api.thingspeak.com/update";
+
+    private static final String READ_API_KEY = "RKTMBAN559EUAS9B";
+    private static final String WRITE_API_KEY = "CVZSD9VIVJZNS2XG";
+
+    private TextView temperaturaTextView;
+    private ProgressBar loadingProgressBar;
+    private Button siButton, noButton, actualizarButton;
+    private AsyncHttpClient client;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Inicialización de vistas
+        // Inicializar vistas
         temperaturaTextView = findViewById(R.id.temperaturaTextView);
-        progressBar = findViewById(R.id.progressBar);
-        botonSi = findViewById(R.id.botonSi);
-        botonNo = findViewById(R.id.botonNo);
-        botonLeer = findViewById(R.id.botonLeer);
-        confirmationTextView = findViewById(R.id.confirmationTextView);
+        loadingProgressBar = findViewById(R.id.loadingProgressBar);
+        siButton = findViewById(R.id.siButton);
+        noButton = findViewById(R.id.noButton);
+        actualizarButton = findViewById(R.id.actualizarButton);
 
-        // Acción del botón "Leer ThingSpeak"
-        botonLeer.setOnClickListener(v -> obtenerTemperaturaDeThingSpeak());
+        // Inicializar AsyncHttpClient una sola vez para ser reutilizado
+        client = new AsyncHttpClient();
 
-        // Acción del botón "Sí"
-        botonSi.setOnClickListener(v -> {
-            activarAlerta(true);
-            enviarComandoThingSpeak(1);
-        });
+        // Configurar botones
+        siButton.setOnClickListener(v -> enviarComando(1));
+        noButton.setOnClickListener(v -> enviarComando(0));
+        actualizarButton.setOnClickListener(v -> obtenerDatosThingSpeak());
 
-        // Acción del botón "No"
-        botonNo.setOnClickListener(v -> {
-            activarAlerta(false);
-            enviarComandoThingSpeak(0);
-        });
+        // Obtener datos iniciales
+        obtenerDatosThingSpeak();
     }
 
-    private void obtenerTemperaturaDeThingSpeak() {
-        progressBar.setVisibility(View.VISIBLE);
-        AsyncHttpClient client = new AsyncHttpClient();
-        client.get(THINGSPEAK_API_URL, new JsonHttpResponseHandler() {
+    // Función para obtener datos de ThingSpeak
+    private void obtenerDatosThingSpeak() {
+        mostrarProgreso(true);
+
+        RequestParams params = new RequestParams();
+        params.put("api_key", READ_API_KEY);
+        params.put("results", 1); // Obtener solo el último feed
+
+        client.get(CHANNEL_READ_URL, params, new JsonHttpResponseHandler() {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                progressBar.setVisibility(View.GONE);
-                Log.d("ThingSpeakResponse", "Response: " + response.toString());
-                Float temperatura = parseTemperature(response);
-                if (temperatura != null) {
-                    temperaturaTextView.setText(String.format("Temperatura: %.1f°C", temperatura));
-                    boolean isHighTemperature = temperatura > 20.0;
-                    if (isHighTemperature) {
-                        mostrarNotificacion("¡RIESGO DE TEMPERATURA ALTA!");
-                        mostrarBotonesAccion(true);
+                try {
+                    JSONArray feeds = response.optJSONArray("feeds");
+                    if (feeds != null && feeds.length() > 0) {
+                        JSONObject feed = feeds.getJSONObject(0);
+                        double temperatura = feed.optDouble("field1", Double.NaN);
+
+                        if (!Double.isNaN(temperatura)) {
+                            temperaturaTextView.setText(String.format("Temperatura: %.1f °C", temperatura));
+                        } else {
+                            temperaturaTextView.setText("Temperatura no disponible");
+                        }
                     } else {
-                        mostrarBotonesAccion(false);
+                        temperaturaTextView.setText("No hay datos disponibles");
                     }
-                } else {
-                    temperaturaTextView.setText("Error al obtener la temperatura");
-                    Log.e("TemperatureError", "No se pudo parsear la temperatura");
-                    mostrarBotonesAccion(false);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    mostrarError("Error al obtener datos. Intenta nuevamente.");
+                } finally {
+                    mostrarProgreso(false);
                 }
             }
 
             @Override
             public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
-                progressBar.setVisibility(View.GONE);
-                temperaturaTextView.setText("Error al obtener la temperatura");
-                Log.e("FetchTemperatureTask", "Error en la respuesta: " + statusCode);
-                Log.e("FetchTemperatureTask", "Detalles del error: ", throwable);
-                mostrarBotonesAccion(false);
+                mostrarProgreso(false);
+                if (statusCode == 0) {
+                    mostrarError("Error de conexión. Verifica tu conexión y vuelve a intentarlo.");
+                } else {
+                    mostrarError("Error al obtener datos. Código de error: " + statusCode);
+                }
             }
         });
     }
 
-    private void mostrarBotonesAccion(boolean mostrar) {
-        LinearLayout actionButtons = findViewById(R.id.actionButtons);
-        if (mostrar) {
-            actionButtons.setVisibility(View.VISIBLE);
-            botonSi.setEnabled(true);
-            botonNo.setEnabled(true);
-        } else {
-            actionButtons.setVisibility(View.GONE);
-            botonSi.setEnabled(false);
-            botonNo.setEnabled(false);
-        }
-    }
+    // Función para enviar el comando al canal de ThingSpeak
+    private void enviarComando(int comando) {
+        mostrarProgreso(true);
 
-    private float parseTemperature(JSONObject response) {
-        try {
-            JSONObject feed = response.getJSONArray("feeds").getJSONObject(0);
-            return Float.parseFloat(feed.getString("field1"));
-        } catch (Exception e) {
-            return -1; // Retorna un valor no válido en caso de error
-        }
-    }
+        RequestParams params = new RequestParams();
+        params.put("api_key", WRITE_API_KEY);
+        params.put("field2", comando);  // Enviar el comando (1 o 0)
 
-    private void manejarBotonesSegunTemperatura(float temperatura) {
-        boolean isHighTemperature = temperatura > 20.0;
-        if (isHighTemperature) {
-            botonSi.setEnabled(true);
-            botonNo.setEnabled(true);
-            mostrarNotificacion("¡RIESGO DE TEMPERATURA ALTA!");
-        } else {
-            botonSi.setEnabled(false);
-            botonNo.setEnabled(false);
-        }
-    }
-
-    private void activarAlerta(boolean activar) {
-        botonSi.setEnabled(false);  // Deshabilitar botones
-        botonNo.setEnabled(false);  // Deshabilitar botones
-
-        if (activar) {
-            mostrarMensajeConfirmacion("Alerta activada en la habitación", "#4CAF50");
-            enviarComandoThingSpeak(1);
-        } else {
-            mostrarMensajeConfirmacion("Acción cancelada", "#F44336");
-            enviarComandoThingSpeak(0);
-        }
-    }
-
-    private void mostrarError() {
-        temperaturaTextView.setText("Error al obtener la temperatura");
-        botonSi.setEnabled(false);  // Deshabilitar botones
-        botonNo.setEnabled(false);  // Deshabilitar botones
-    }
-
-    private void mostrarNotificacion(String mensaje) {
-        Toast.makeText(this, mensaje, Toast.LENGTH_LONG).show();
-    }
-
-    private void mostrarMensajeConfirmacion(String mensaje, String color) {
-        confirmationTextView.setText(mensaje);
-        confirmationTextView.setTextColor(android.graphics.Color.parseColor(color));
-        confirmationTextView.setVisibility(View.VISIBLE);
-    }
-
-    private void enviarComandoThingSpeak(int comando) {
-        AsyncHttpClient client = new AsyncHttpClient();
-        String url = "https://api.thingspeak.com/update.json?api_key=RKTMBAN559EUAS9B&field2=" + comando;
-
-        // Enviar solicitud GET con el valor de 'comando' a ThingSpeak
-        client.get(url, new JsonHttpResponseHandler() {
+        client.post(CHANNEL_WRITE_URL, params, new JsonHttpResponseHandler() {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                if (statusCode == 200) {
-                    Log.d("ThingSpeak", "Comando enviado correctamente: " + comando);
-                    // Puedes mostrar una notificación o realizar otra acción si es necesario
-                } else {
-                    Log.e("ThingSpeak", "Error al enviar comando, código de estado: " + statusCode);
-                }
+                Toast.makeText(MainActivity.this, "Comando enviado correctamente", Toast.LENGTH_SHORT).show();
+                mostrarProgreso(false);
             }
 
             @Override
             public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
-                Log.e("ThingSpeak", "Error al enviar comando: " + throwable.getMessage());
+                mostrarProgreso(false);
+                if (statusCode == 0) {
+                    mostrarError("Error de conexión al enviar comando. Intenta nuevamente.");
+                } else {
+                    mostrarError("Error al enviar comando. Código de error: " + statusCode);
+                }
             }
         });
+    }
+
+    // Función para mostrar el progreso (loading)
+    private void mostrarProgreso(boolean enProgreso) {
+        loadingProgressBar.setVisibility(enProgreso ? View.VISIBLE : View.GONE);
+    }
+
+    // Función para mostrar mensajes de error con un botón de reintento usando AlertDialog
+    private void mostrarError(String mensaje) {
+        // Mostrar mensaje de error usando Snackbar
+        Snackbar.make(findViewById(android.R.id.content), mensaje, Snackbar.LENGTH_LONG)
+                .setAction("Reintentar", v -> obtenerDatosThingSpeak())  // Reintentar acción
+                .show();
     }
 }
+
