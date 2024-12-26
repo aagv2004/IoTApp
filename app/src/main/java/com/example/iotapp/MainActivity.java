@@ -1,79 +1,53 @@
 package com.example.iotapp;
 
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.os.Build;
 import android.os.Bundle;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
 import com.loopj.android.http.AsyncHttpClient;
-import com.loopj.android.http.AsyncHttpResponseHandler;
 import com.loopj.android.http.JsonHttpResponseHandler;
-
-import org.json.JSONArray;
 import org.json.JSONObject;
-
 import cz.msebera.android.httpclient.Header;
-import cz.msebera.android.httpclient.entity.StringEntity;
 
 public class MainActivity extends AppCompatActivity {
-    private TextView temperaturaTextView;
-    private Button botonSi, botonNo;
-    private ProgressBar progressBar;
 
-    private static final String THINGSPEAK_API_URL = "https://api.thingspeak.com/channels/2794908/feeds.json?api_key=RKTMBAN559EUAS9B&results=2";
-    private static final String API_KEY = "CVZSD9VIVJZNS2XG";
-    private static final String CHANNEL_URL = "https://api.thingspeak.com/update";
+    private static final String THINGSPEAK_API_URL = "https://api.thingspeak.com/channels/2794908/fields/1.json?api_key=RKTMBAN559EUAS9B&results=1";
+    private TextView temperaturaTextView, confirmationTextView;
+    private ProgressBar progressBar;
+    private Button botonSi, botonNo, botonLeer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Inicialización de vistas
         temperaturaTextView = findViewById(R.id.temperaturaTextView);
         progressBar = findViewById(R.id.progressBar);
-        TextView confirmationTextView = findViewById(R.id.confirmationTextView);
         botonSi = findViewById(R.id.botonSi);
         botonNo = findViewById(R.id.botonNo);
+        botonLeer = findViewById(R.id.botonLeer);
+        confirmationTextView = findViewById(R.id.confirmationTextView);
 
-        // Animación inicial
-        animateViews();
+        // Acción del botón "Leer ThingSpeak"
+        botonLeer.setOnClickListener(v -> obtenerTemperaturaDeThingSpeak());
 
-        // Inicializar notificaciones
-        crearCanalDeNotificaciones();
-
-        // Lógica inicial
-        botonSi.setEnabled(false);
-        botonNo.setEnabled(false);
-        obtenerTemperaturaDeThingSpeak();
-
-        // Botón Sí
+        // Acción del botón "Sí"
         botonSi.setOnClickListener(v -> {
-            mostrarMensajeConfirmacion(confirmationTextView, "Alerta activada en la habitación.", "#4CAF50");
+            activarAlerta(true);
             enviarComandoThingSpeak(1);
         });
 
-        // Botón No
+        // Acción del botón "No"
         botonNo.setOnClickListener(v -> {
-            mostrarMensajeConfirmacion(confirmationTextView, "Acción cancelada.", "#F44336");
+            activarAlerta(false);
             enviarComandoThingSpeak(0);
         });
-    }
-
-    private void animateViews() {
-        findViewById(R.id.preguntaTextView).animate().alpha(1).setDuration(1000).setStartDelay(500).start();
-        findViewById(R.id.actionButtons).animate().alpha(1).setDuration(1000).setStartDelay(1000).start();
     }
 
     private void obtenerTemperaturaDeThingSpeak() {
@@ -83,17 +57,21 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                 progressBar.setVisibility(View.GONE);
+                Log.d("ThingSpeakResponse", "Response: " + response.toString());
                 Float temperatura = parseTemperature(response);
                 if (temperatura != null) {
                     temperaturaTextView.setText(String.format("Temperatura: %.1f°C", temperatura));
-                    boolean isHighTemperature = temperatura > 30.0;
+                    boolean isHighTemperature = temperatura > 20.0;
                     if (isHighTemperature) {
                         mostrarNotificacion("¡RIESGO DE TEMPERATURA ALTA!");
+                        mostrarBotonesAccion(true);
+                    } else {
+                        mostrarBotonesAccion(false);
                     }
-                    botonSi.setEnabled(isHighTemperature);
-                    botonNo.setEnabled(isHighTemperature);
                 } else {
                     temperaturaTextView.setText("Error al obtener la temperatura");
+                    Log.e("TemperatureError", "No se pudo parsear la temperatura");
+                    mostrarBotonesAccion(false);
                 }
             }
 
@@ -102,68 +80,94 @@ public class MainActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.GONE);
                 temperaturaTextView.setText("Error al obtener la temperatura");
                 Log.e("FetchTemperatureTask", "Error en la respuesta: " + statusCode);
+                Log.e("FetchTemperatureTask", "Detalles del error: ", throwable);
+                mostrarBotonesAccion(false);
             }
         });
     }
 
-    private Float parseTemperature(JSONObject jsonData) {
-        try {
-            JSONArray feeds = jsonData.getJSONArray("feeds");
-            if (feeds.length() > 0) {
-                JSONObject latestFeed = feeds.getJSONObject(0);
-                return (float) latestFeed.getDouble("field1");
-            }
-        } catch (Exception e) {
-            Log.e("FetchTemperatureTask", "Error al parsear JSON: " + e.getMessage());
+    private void mostrarBotonesAccion(boolean mostrar) {
+        LinearLayout actionButtons = findViewById(R.id.actionButtons);
+        if (mostrar) {
+            actionButtons.setVisibility(View.VISIBLE);
+            botonSi.setEnabled(true);
+            botonNo.setEnabled(true);
+        } else {
+            actionButtons.setVisibility(View.GONE);
+            botonSi.setEnabled(false);
+            botonNo.setEnabled(false);
         }
-        return null;
+    }
+
+    private float parseTemperature(JSONObject response) {
+        try {
+            JSONObject feed = response.getJSONArray("feeds").getJSONObject(0);
+            return Float.parseFloat(feed.getString("field1"));
+        } catch (Exception e) {
+            return -1; // Retorna un valor no válido en caso de error
+        }
+    }
+
+    private void manejarBotonesSegunTemperatura(float temperatura) {
+        boolean isHighTemperature = temperatura > 20.0;
+        if (isHighTemperature) {
+            botonSi.setEnabled(true);
+            botonNo.setEnabled(true);
+            mostrarNotificacion("¡RIESGO DE TEMPERATURA ALTA!");
+        } else {
+            botonSi.setEnabled(false);
+            botonNo.setEnabled(false);
+        }
+    }
+
+    private void activarAlerta(boolean activar) {
+        botonSi.setEnabled(false);  // Deshabilitar botones
+        botonNo.setEnabled(false);  // Deshabilitar botones
+
+        if (activar) {
+            mostrarMensajeConfirmacion("Alerta activada en la habitación", "#4CAF50");
+            enviarComandoThingSpeak(1);
+        } else {
+            mostrarMensajeConfirmacion("Acción cancelada", "#F44336");
+            enviarComandoThingSpeak(0);
+        }
+    }
+
+    private void mostrarError() {
+        temperaturaTextView.setText("Error al obtener la temperatura");
+        botonSi.setEnabled(false);  // Deshabilitar botones
+        botonNo.setEnabled(false);  // Deshabilitar botones
     }
 
     private void mostrarNotificacion(String mensaje) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "canal_id")
-                .setSmallIcon(R.drawable.baseline_crisis_alert_24)
-                .setContentTitle("Alerta de Temperatura")
-                .setContentText(mensaje)
-                .setPriority(NotificationCompat.PRIORITY_HIGH);
-
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        notificationManager.notify(1, builder.build());
+        Toast.makeText(this, mensaje, Toast.LENGTH_LONG).show();
     }
 
-    private void crearCanalDeNotificaciones() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel canal = new NotificationChannel("canal_id", "Canal de alertas", NotificationManager.IMPORTANCE_HIGH);
-            canal.setDescription("Canal para notificaciones de temperatura");
-            NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(canal);
-        }
-    }
-
-    private void mostrarMensajeConfirmacion(TextView confirmationTextView, String mensaje, String color) {
-        confirmationTextView.setVisibility(View.VISIBLE);
+    private void mostrarMensajeConfirmacion(String mensaje, String color) {
         confirmationTextView.setText(mensaje);
-        confirmationTextView.setTextColor(Color.parseColor(color));
-        confirmationTextView.animate().alpha(1).setDuration(500).withEndAction(() -> {
-            confirmationTextView.animate().alpha(0).setDuration(1000).setStartDelay(2000).start();
-        }).start();
+        confirmationTextView.setTextColor(android.graphics.Color.parseColor(color));
+        confirmationTextView.setVisibility(View.VISIBLE);
     }
 
     private void enviarComandoThingSpeak(int comando) {
         AsyncHttpClient client = new AsyncHttpClient();
-        String url = CHANNEL_URL + "?api_key=" + API_KEY + "&field2=" + comando;
+        String url = "https://api.thingspeak.com/update.json?api_key=RKTMBAN559EUAS9B&field2=" + comando;
 
-        client.post(url, new AsyncHttpResponseHandler() {
+        // Enviar solicitud GET con el valor de 'comando' a ThingSpeak
+        client.get(url, new JsonHttpResponseHandler() {
             @Override
-            public void onSuccess(int statusCode, Header[] headers, byte[] responseBody) {
-                Log.i("ThingSpeak", "Comando enviado exitosamente: " + comando);
+            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                if (statusCode == 200) {
+                    Log.d("ThingSpeak", "Comando enviado correctamente: " + comando);
+                    // Puedes mostrar una notificación o realizar otra acción si es necesario
+                } else {
+                    Log.e("ThingSpeak", "Error al enviar comando, código de estado: " + statusCode);
+                }
             }
 
             @Override
-            public void onFailure(int statusCode, Header[] headers, byte[] responseBody, Throwable error) {
-                Log.e("ThingSpeak", "Error al enviar comando: " + error.getMessage());
+            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
+                Log.e("ThingSpeak", "Error al enviar comando: " + throwable.getMessage());
             }
         });
     }
