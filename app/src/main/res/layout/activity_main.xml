@@ -1,68 +1,125 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
     <!-- Texto para mostrar la temperatura -->
+
+    <!-- Texto para mostrar la humedad -->
+
     <TextView
         android:id="@+id/temperaturaTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_below="@+id/imageView3"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginStart="138dp"
+        android:layout_marginTop="19dp"
+        android:layout_marginEnd="116dp"
         android:text="Temperatura: 0.0 °C"
-        android:textSize="18sp"
-        android:layout_marginTop="40dp"
-        android:layout_centerHorizontal="true" />
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/humedadTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/temperaturaTextView"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp"
+        android:text="Humedad: 0.0 %"
+        android:textSize="18sp" />
 
     <!-- Pregunta sobre la luz verde -->
-    <TextView
-        android:id="@+id/preguntaTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="¿Desea activar luz verde?"
-        android:textSize="16sp"
-        android:layout_below="@id/temperaturaTextView"
-        android:layout_marginTop="20dp"
-        android:layout_centerHorizontal="true" />
 
     <!-- Botón Sí -->
-    <Button
-        android:id="@+id/siButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Sí"
-        android:layout_below="@id/preguntaTextView"
-        android:layout_marginTop="20dp"
-        android:layout_centerHorizontal="true" />
 
     <!-- Botón No -->
-    <Button
-        android:id="@+id/noButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="No"
-        android:layout_below="@id/siButton"
-        android:layout_marginTop="20dp"
-        android:layout_centerHorizontal="true" />
 
     <!-- Botón de Actualizar -->
-    <Button
-        android:id="@+id/actualizarButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Actualizar"
-        android:layout_below="@id/noButton"
-        android:layout_marginTop="20dp"
-        android:layout_centerHorizontal="true" />
 
     <!-- ProgressBar (Oculto por defecto) -->
+
+    <Button
+        android:id="@+id/siButton"
+        android:layout_width="146dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginStart="39dp"
+        android:layout_marginTop="500dp"
+        android:layout_marginEnd="225dp"
+        android:backgroundTint="#00C853"
+        android:text="Activar"
+        android:textColor="@color/buttonText" />
+
+    <Button
+        android:id="@+id/noButton"
+        android:layout_width="153dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginStart="231dp"
+        android:layout_marginTop="499dp"
+        android:layout_marginEnd="25dp"
+        android:backgroundTint="#D50000"
+        android:text="Desactivar"
+        android:textColor="@color/buttonText" />
+
+    <Button
+        android:id="@+id/actualizarButton"
+        android:layout_width="262dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/imageView3"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginStart="78dp"
+        android:layout_marginTop="240dp"
+        android:layout_marginEnd="71dp"
+        android:backgroundTint="#304FFE"
+        android:text="Actualizar"
+        android:textColor="@color/buttonText" />
+
     <ProgressBar
         android:id="@+id/loadingProgressBar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:visibility="gone"
         android:layout_centerInParent="true"
-        android:indeterminate="true" />
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/imageView2"
+        android:layout_width="128dp"
+        android:layout_height="105dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginStart="261dp"
+        android:layout_marginTop="234dp"
+        android:layout_marginEnd="22dp"
+        app:srcCompat="@drawable/ic_android" />
+
+    <ImageView
+        android:id="@+id/imageView3"
+        android:layout_width="326dp"
+        android:layout_height="106dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="233dp"
+        android:layout_marginEnd="87dp"
+        app:srcCompat="@drawable/ic_androidstudio" />
+
+    <ImageView
+        android:id="@+id/imageView4"
+        android:layout_width="match_parent"
+        android:layout_height="234dp"
+        app:srcCompat="@drawable/ic_tspak" />
 
 </RelativeLayout>
